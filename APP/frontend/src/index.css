@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    color-scheme: dark;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Space Grotesk", sans-serif;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(71, 215, 255, 0.2), transparent 24%),
+        radial-gradient(circle at 85% 15%, rgba(138, 92, 255, 0.22), transparent 30%),
+        radial-gradient(circle at 50% 80%, rgba(21, 245, 186, 0.12), transparent 24%),
+        #070816;
+    color: #eef4ff;
+    overflow-x: hidden;
+}
+
+body.light {
+    color-scheme: light;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(71, 215, 255, 0.14), transparent 24%),
+        radial-gradient(circle at 85% 15%, rgba(138, 92, 255, 0.14), transparent 30%),
+        radial-gradient(circle at 50% 80%, rgba(21, 245, 186, 0.08), transparent 24%),
+        linear-gradient(160deg, #f6f8ff 0%, #dbe7ff 100%);
+    color: #08111f;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+::selection {
+    background: rgba(71, 215, 255, 0.28);
+}
+
+.glass-panel {
+    background: linear-gradient(180deg, rgba(17, 23, 52, 0.75), rgba(8, 11, 25, 0.7));
+    backdrop-filter: blur(24px);
+}
+
+body.light .glass-panel {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(239, 244, 255, 0.76));
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    width: 10px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(71, 215, 255, 0.55), rgba(138, 92, 255, 0.55));
+    border-radius: 999px;
+}
+
+.particle {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(4px);
+    opacity: 0.55;
+}
+
+.text-wrap-pretty {
+    text-wrap: pretty;
+}
+
+@keyframes ripple {
+    from {
+        transform: scale(0);
+        opacity: 0.65;
+    }
+    to {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
