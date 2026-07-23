@@ -2,11 +2,11 @@ from dataclasses import dataclass
 
 try:
     import torch
-    from transformers import PegasusForConditionalGeneration, PegasusTokenizer
+    from transformers import BartForConditionalGeneration, BartTokenizer
 except Exception:
     torch = None
-    PegasusForConditionalGeneration = None
-    PegasusTokenizer = None
+    BartForConditionalGeneration = None
+    BartTokenizer = None
 
 try:
     from backend.summarizer import normalize_input_text
@@ -14,26 +14,26 @@ except ModuleNotFoundError:
     from summarizer import normalize_input_text
 
 
-DEFAULT_PEGASUS_MODEL = "google/pegasus-cnn_dailymail"
+DEFAULT_BART_MODEL = "facebook/bart-large-cnn"
 
 
 @dataclass
-class PegasusSummarizer:
-    model_name: str = DEFAULT_PEGASUS_MODEL
+class BartSummarizer:
+    model_name: str = DEFAULT_BART_MODEL
 
     def __post_init__(self):
         self._tokenizer = None
         self._model = None
 
     def _load(self):
-        if PegasusTokenizer is None or PegasusForConditionalGeneration is None:
+        if BartTokenizer is None or BartForConditionalGeneration is None:
             raise RuntimeError(
-                "PEGASUS dependencies are not installed. Install transformers, sentencepiece, and torch to use this model."
+                "BART dependencies are not installed. Install transformers and torch to use this model."
             )
 
         if self._tokenizer is None or self._model is None:
-            self._tokenizer = PegasusTokenizer.from_pretrained(self.model_name, force_download=True)
-            self._model = PegasusForConditionalGeneration.from_pretrained(self.model_name)
+            self._tokenizer = BartTokenizer.from_pretrained(self.model_name)
+            self._model = BartForConditionalGeneration.from_pretrained(self.model_name)
             self._model.eval()
 
     def summarize(self, text: str, summary_length: int = 3) -> str:
@@ -63,7 +63,7 @@ class PegasusSummarizer:
             num_beams=4,
             min_length=min_length,
             max_length=max_length,
-            length_penalty=0.9,
+            length_penalty=2.0,
             early_stopping=True,
             no_repeat_ngram_size=3,
         )
@@ -71,4 +71,4 @@ class PegasusSummarizer:
         return decoded.strip()
 
 
-PEGASUS_SUMMARIZER = PegasusSummarizer()
+BART_SUMMARIZER = BartSummarizer()

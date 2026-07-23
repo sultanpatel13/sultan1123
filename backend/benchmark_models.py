@@ -6,10 +6,12 @@ from collections import Counter
 from pathlib import Path
 
 try:
+    from backend.bart_model import BART_SUMMARIZER
     from backend.pegasus_model import PEGASUS_SUMMARIZER
     from backend.summarizer import normalize_input_text
     from backend.supervised_model import load_supervised_summarizer
 except ModuleNotFoundError:
+    from bart_model import BART_SUMMARIZER
     from pegasus_model import PEGASUS_SUMMARIZER
     from summarizer import normalize_input_text
     from supervised_model import load_supervised_summarizer
@@ -155,6 +157,11 @@ def main() -> None:
             "pegasus",
             rows,
             lambda article: PEGASUS_SUMMARIZER.summarize(article, summary_length=args.summary_length),
+        ),
+        benchmark_model(
+            "bart",
+            rows,
+            lambda article: BART_SUMMARIZER.summarize(article, summary_length=args.summary_length),
         ),
     ]
 

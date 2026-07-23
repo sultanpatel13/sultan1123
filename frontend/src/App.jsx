@@ -8,9 +8,7 @@ import {
     History,
     Menu,
     Mic,
-    MoonStar,
     Sparkles,
-    SunMedium,
     Trash2,
     WandSparkles,
     X,
@@ -21,6 +19,7 @@ const SUMMARY_PRESETS = { short: 2, medium: 3, long: 5 };
 const MODEL_OPTIONS = {
     extractive: "Extractive AI",
     pegasus: "PEGASUS",
+    bart: "BART",
 };
 const DEFAULT_PLACEHOLDER = "Paste or type your text here...";
 const DEFAULT_OUTPUT = "Your summary will appear here with highlighted key sentences and analytics.";
@@ -49,10 +48,9 @@ function App() {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [resultsOpen, setResultsOpen] = useState(false);
     const [historyItems, setHistoryItems] = useState([]);
-    const [theme, setTheme] = useState("dark");
     const [isListening, setIsListening] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [ripples, setRipples] = useState([]);
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const recognitionRef = useRef(null);
     const baseTranscriptRef = useRef("");
@@ -69,21 +67,6 @@ function App() {
     useEffect(() => {
         window.localStorage.setItem(HISTORY_KEY, JSON.stringify(historyItems));
     }, [historyItems]);
-
-    useEffect(() => {
-        document.body.classList.toggle("light", theme === "light");
-    }, [theme]);
-
-    useEffect(() => {
-        window.localStorage.setItem("summarizer-theme", theme);
-    }, [theme]);
-
-    useEffect(() => {
-        const savedTheme = window.localStorage.getItem("summarizer-theme");
-        if (savedTheme === "dark" || savedTheme === "light") {
-            setTheme(savedTheme);
-        }
-    }, []);
 
     useEffect(() => {
         if (!summary) {
@@ -106,37 +89,6 @@ function App() {
     const keyTerms = useMemo(() => new Set(analysis?.top_keywords ?? []), [analysis]);
     const confidence = analysis?.content_accuracy_score ?? 0;
     const aiSignal = analysis?.ai_writing_signals?.score ?? 0;
-    const isLight = theme === "light";
-
-    const particles = Array.from({ length: 16 }, (_, index) => ({
-        id: index,
-        width: 80 + (index % 5) * 18,
-        height: 80 + (index % 4) * 16,
-        left: `${(index * 7) % 100}%`,
-        top: `${(index * 13) % 100}%`,
-        delay: `${index * 0.35}s`,
-        color:
-            index % 3 === 0
-                ? "rgba(71, 215, 255, 0.35)"
-                : index % 3 === 1
-                    ? "rgba(138, 92, 255, 0.28)"
-                    : "rgba(21, 245, 186, 0.22)",
-    }));
-
-    const addRipple = (event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height);
-        const ripple = {
-            id: Date.now() + Math.random(),
-            x: rect.left + rect.width / 2 - size / 2,
-            y: rect.top + rect.height / 2 - size / 2,
-            size,
-        };
-        setRipples((current) => [...current, ripple]);
-        window.setTimeout(() => {
-            setRipples((current) => current.filter((item) => item.id !== ripple.id));
-        }, 650);
-    };
 
     const handleUpload = (file) => {
         setUploadedFile(file || null);
@@ -248,10 +200,10 @@ function App() {
                 const errorMap = {
                     "not-allowed": "Microphone permission was denied. Please allow microphone access and try again.",
                     "service-not-allowed": "Speech recognition service is not allowed in this browser.",
-                    "network": "A network issue interrupted voice input. Please try again.",
+                    network: "A network issue interrupted voice input. Please try again.",
                     "no-speech": "No speech was detected. Try speaking a little closer to the microphone.",
                     "audio-capture": "No microphone was found. Please check your audio input device.",
-                    "aborted": "Voice input was stopped.",
+                    aborted: "Voice input was stopped.",
                 };
                 setError(errorMap[event.error] || "Voice capture ran into an issue. Please try again.");
                 recognitionActiveRef.current = false;
@@ -271,7 +223,7 @@ function App() {
         setDraftTranscript("");
         try {
             recognitionRef.current.start();
-        } catch (error) {
+        } catch {
             recognitionActiveRef.current = false;
             setIsListening(false);
             setError("Voice input could not start. If the microphone is already active, stop it and try again.");
@@ -283,7 +235,7 @@ function App() {
         recognitionActiveRef.current = false;
         try {
             recognitionRef.current?.stop();
-        } catch (error) {
+        } catch {
             recognitionRef.current?.abort?.();
         }
         setIsListening(false);
@@ -365,65 +317,51 @@ function App() {
     };
 
     return (
-        <div className={`relative min-h-screen overflow-hidden transition-colors duration-500 ${isLight ? "text-slate-900" : "bg-night text-cloud"}`}>
-            <div className={`pointer-events-none absolute inset-0 bg-grid-fade bg-[size:52px_52px] ${isLight ? "opacity-[0.04]" : "opacity-[0.08]"}`} />
-            {particles.map((particle) => (
-                <span
-                    key={particle.id}
-                    className="particle animate-drift"
-                    style={{
-                        width: particle.width,
-                        height: particle.height,
-                        left: particle.left,
-                        top: particle.top,
-                        background: particle.color,
-                        animationDelay: particle.delay,
-                    }}
-                />
-            ))}
-            <div className="relative z-10 mx-auto flex min-h-screen max-w-[1600px] flex-col px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-                <TopNav theme={theme} setTheme={setTheme} setHistoryOpen={setHistoryOpen} />
-                <div className="flex flex-1">
-                    <InputPanel
-                        draftTranscript={draftTranscript}
-                        isLight={isLight}
-                        text={text}
-                        setText={setText}
-                        inputWordCount={inputWordCount}
-                        inputCharacterCount={text.length}
-                        uploadedFile={uploadedFile}
-                        handleUpload={handleUpload}
-                        summaryPreset={summaryPreset}
-                        setSummaryPreset={setSummaryPreset}
-                        summaryModel={summaryModel}
-                        setSummaryModel={setSummaryModel}
-                        handleClear={handleClear}
-                        loading={loading}
-                        isListening={isListening}
-                        startVoiceInput={startVoiceInput}
-                        stopVoiceInput={stopVoiceInput}
-                        isDragging={isDragging}
-                        setIsDragging={setIsDragging}
-                    />
-                </div>
-            </div>
-            <FloatingActions
-                isLight={isLight}
-                addRipple={addRipple}
-                handleSummarize={handleSummarize}
-                handleCopy={handleCopy}
-                handleClear={handleClear}
-                ripples={ripples}
+        <div className="relative min-h-screen bg-canvas-soft text-ink">
+            <TopNav
+                setHistoryOpen={setHistoryOpen}
+                mobileNavOpen={mobileNavOpen}
+                setMobileNavOpen={setMobileNavOpen}
             />
+
+            <HeroBand onSummarize={handleSummarize} loading={loading} />
+
+            <main className="relative z-10 mx-auto max-w-page px-4 pb-24 pt-8 sm:px-6 lg:px-8">
+                <InputPanel
+                    draftTranscript={draftTranscript}
+                    text={text}
+                    setText={setText}
+                    inputWordCount={inputWordCount}
+                    inputCharacterCount={text.length}
+                    uploadedFile={uploadedFile}
+                    handleUpload={handleUpload}
+                    summaryPreset={summaryPreset}
+                    setSummaryPreset={setSummaryPreset}
+                    summaryModel={summaryModel}
+                    setSummaryModel={setSummaryModel}
+                    handleClear={handleClear}
+                    loading={loading}
+                    isListening={isListening}
+                    startVoiceInput={startVoiceInput}
+                    stopVoiceInput={stopVoiceInput}
+                    isDragging={isDragging}
+                    setIsDragging={setIsDragging}
+                    handleSummarize={handleSummarize}
+                />
+
+                <FeatureGrid />
+            </main>
+
+            <Footer />
+
             <HistoryDrawer
-                isLight={isLight}
                 historyOpen={historyOpen}
                 setHistoryOpen={setHistoryOpen}
                 historyItems={historyItems}
                 loadHistoryItem={loadHistoryItem}
             />
+
             <ResultsWindow
-                isLight={isLight}
                 resultsOpen={resultsOpen}
                 setResultsOpen={setResultsOpen}
                 loading={loading}
@@ -440,74 +378,151 @@ function App() {
                 handleDownloadPdf={handleDownloadPdf}
                 uploadedFile={uploadedFile}
             />
-            {error && (
-                <motion.div
-                    initial={{ opacity: 0, y: 18 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`fixed bottom-6 left-6 z-30 max-w-md rounded-[24px] border px-5 py-4 text-sm shadow-glass ${
-                        isLight
-                            ? "border-rose-400/35 bg-rose-100/90 text-rose-800"
-                            : "border-rose-400/25 bg-rose-500/15 text-rose-100"
-                    }`}
-                >
-                    {error}
-                </motion.div>
-            )}
+
+            <AnimatePresence>
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 18 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 18 }}
+                        className="fixed bottom-6 left-6 z-50 max-w-md toast-error"
+                    >
+                        {error}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
 
-function TopNav({ theme, setTheme, setHistoryOpen }) {
-    const isLight = theme === "light";
+function TopNav({ setHistoryOpen, mobileNavOpen, setMobileNavOpen }) {
     return (
-        <motion.nav
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`glass-panel mb-6 flex items-center justify-between rounded-[28px] border px-5 py-4 shadow-glass ${
-                isLight ? "border-slate-300/60" : "border-white/10"
-            }`}
-        >
-            <div className="flex items-center gap-4">
+        <nav className="nav-bar">
+            <div className="mx-auto flex w-full max-w-page items-center justify-between px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-sm bg-ink">
+                            <Sparkles size={14} className="text-on-primary" />
+                        </div>
+                        <span className="text-body-sm font-medium text-ink">Summarize</span>
+                    </div>
+                    <div className="hidden items-center gap-1 md:flex">
+                        <button type="button" className="btn-ghost">
+                            Features
+                        </button>
+                        <button type="button" onClick={() => setHistoryOpen(true)} className="btn-ghost">
+                            History
+                        </button>
+                        <button type="button" className="btn-ghost">
+                            Docs
+                        </button>
+                    </div>
+                </div>
+
+                <div className="hidden items-center gap-2 sm:flex">
+                    <button type="button" className="btn-outline">
+                        Ask AI
+                    </button>
+                    <button type="button" onClick={() => setHistoryOpen(true)} className="btn-secondary-sm">
+                        History
+                    </button>
+                    <button type="button" onClick={() => setHistoryOpen(true)} className="btn-primary-sm">
+                        Open App
+                    </button>
+                </div>
+
                 <button
                     type="button"
-                    onClick={() => setHistoryOpen(true)}
-                    className={`rounded-2xl border p-3 transition hover:scale-105 hover:border-aurora/50 ${
-                        isLight
-                            ? "border-slate-300/70 bg-white/70 text-slate-700 hover:text-slate-950"
-                            : "border-white/10 bg-white/5 text-white/80 hover:text-white"
-                    }`}
+                    onClick={() => setMobileNavOpen(!mobileNavOpen)}
+                    className="icon-btn sm:hidden"
+                    aria-label="Toggle menu"
                 >
-                    <Menu size={18} />
+                    {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
                 </button>
-                <div>
-                    <p className="font-body text-xs uppercase tracking-[0.4em] text-aurora/80">AI Workspace</p>
-                    <h1 className={`font-display text-xl font-semibold sm:text-2xl ${isLight ? "text-slate-900" : ""}`}>AI Text Summarization Web App</h1>
+            </div>
+
+            <AnimatePresence>
+                {mobileNavOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="absolute left-0 right-0 top-16 overflow-hidden border-b border-hairline bg-canvas sm:hidden"
+                    >
+                        <div className="flex flex-col gap-1 px-4 py-4">
+                            <button type="button" className="btn-ghost justify-start">
+                                Features
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setHistoryOpen(true);
+                                    setMobileNavOpen(false);
+                                }}
+                                className="btn-ghost justify-start"
+                            >
+                                History
+                            </button>
+                            <button type="button" className="btn-ghost justify-start">
+                                Docs
+                            </button>
+                            <div className="mt-2 flex gap-2">
+                                <button type="button" className="btn-outline flex-1">
+                                    Ask AI
+                                </button>
+                                <button type="button" className="btn-primary-sm flex-1">
+                                    Open App
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </nav>
+    );
+}
+
+function HeroBand({ onSummarize, loading }) {
+    return (
+        <section className="relative overflow-hidden bg-canvas">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div className="mesh-gradient absolute -left-1/4 -top-1/4 h-[600px] w-[800px] animate-mesh-drift" />
+                <div className="mesh-gradient absolute -right-1/4 top-0 h-[500px] w-[700px] animate-mesh-drift [animation-delay:3s]" />
+            </div>
+
+            <div className="relative z-10 mx-auto max-w-page px-4 py-16 sm:px-6 sm:py-24 lg:px-8 lg:py-32">
+                <div className="mx-auto max-w-3xl text-center">
+                    <div className="mb-6 flex justify-center">
+                        <span className="banner-marketing">
+                            <span className="caption-mono mr-2 text-mute">New</span>
+                            PEGASUS model now available
+                        </span>
+                    </div>
+                    <h1 className="text-display-xl text-ink sm:text-[48px]">
+                        Summarize any text in seconds.
+                    </h1>
+                    <p className="mx-auto mt-6 max-w-xl text-body-lg text-body">
+                        Paste, upload, or speak your content. Get concise summaries with keyword highlights,
+                        confidence scores, and AI-writing analysis.
+                    </p>
+                    <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                        <button type="button" onClick={onSummarize} disabled={loading} className="btn-primary">
+                            <Sparkles size={16} />
+                            {loading ? "Summarizing..." : "Start Summarizing"}
+                        </button>
+                        <button type="button" className="btn-secondary">
+                            View Documentation
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div className="flex items-center gap-3">
-                <span className={`hidden rounded-full border px-4 py-2 text-xs sm:inline-flex ${isLight ? "border-aurora/40 bg-white/65 text-cyan-700" : "border-aurora/30 bg-aurora/10 text-aurora"}`}>
-                    Futuristic Summaries
-                </span>
-                <button
-                    type="button"
-                    onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-                    className={`rounded-2xl border p-3 transition hover:scale-105 hover:border-violet/50 ${
-                        isLight
-                            ? "border-slate-300/70 bg-white/70 text-slate-700 hover:text-slate-950"
-                            : "border-white/10 bg-white/5 text-white/80 hover:text-white"
-                    }`}
-                >
-                    {theme === "dark" ? <SunMedium size={18} /> : <MoonStar size={18} />}
-                </button>
-            </div>
-        </motion.nav>
+        </section>
     );
 }
 
 function InputPanel(props) {
     const {
         draftTranscript,
-        isLight,
         text,
         setText,
         inputWordCount,
@@ -525,24 +540,26 @@ function InputPanel(props) {
         stopVoiceInput,
         isDragging,
         setIsDragging,
+        handleSummarize,
     } = props;
 
     return (
         <motion.section
-            initial={{ opacity: 0, x: -24 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`glass-panel flex min-h-[72vh] w-full flex-col rounded-[32px] border p-5 shadow-glass ${
-                isLight ? "border-slate-300/60" : "border-white/10"
-            }`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-marketing-lg mb-16"
         >
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <p className="font-body text-xs uppercase tracking-[0.35em] text-violet/80">Input Engine</p>
-                    <h2 className={`font-display text-2xl font-semibold ${isLight ? "text-slate-900" : ""}`}>Context Ingestion</h2>
+                    <p className="caption-mono mb-2">Input Engine</p>
+                    <h2 className="text-display-md text-ink">Context ingestion.</h2>
+                    <p className="mt-2 text-body-sm text-body">
+                        Upload a document or paste text to begin summarization.
+                    </p>
                 </div>
-                <div className={`flex gap-2 text-xs ${isLight ? "text-slate-600" : "text-white/60"}`}>
-                    <span className={`rounded-full border px-3 py-2 ${isLight ? "border-slate-300/70 bg-white/70" : "border-white/10 bg-white/5"}`}>{inputWordCount} words</span>
-                    <span className={`rounded-full border px-3 py-2 ${isLight ? "border-slate-300/70 bg-white/70" : "border-white/10 bg-white/5"}`}>{inputCharacterCount} chars</span>
+                <div className="flex gap-2">
+                    <span className="badge-secondary">{inputWordCount} words</span>
+                    <span className="badge-secondary">{inputCharacterCount} chars</span>
                 </div>
             </div>
 
@@ -558,139 +575,103 @@ function InputPanel(props) {
                     const [file] = event.dataTransfer.files;
                     if (file) handleUpload(file);
                 }}
-                className={`mb-4 overflow-hidden rounded-[28px] border border-dashed p-4 transition duration-300 ${
-                    isDragging ? "border-pulse bg-pulse/10" : isLight ? "border-cyan-400/35 bg-white/60" : "border-aurora/30 bg-white/[0.04]"
+                className={`mb-4 rounded-md border border-dashed p-4 transition ${
+                    isDragging
+                        ? "border-link bg-link-bg-soft/30"
+                        : "border-hairline bg-canvas-soft"
                 }`}
             >
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-aurora/15 p-3 text-aurora shadow-neon">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-canvas-soft-2 text-ink">
                             <FileUp size={18} />
                         </div>
                         <div>
-                            <p className="font-display text-sm font-semibold">Drag, drop, or upload your source</p>
-                            <p className={`text-xs ${isLight ? "text-slate-600" : "text-white/55"}`}>TXT, PDF, DOCX, PPTX, HTML, CSV, JSON, code, logs, and more.</p>
+                            <p className="text-body-sm font-medium text-ink">Drag, drop, or upload your source</p>
+                            <p className="text-xs text-mute">
+                                TXT, PDF, DOCX, PPTX, HTML, CSV, JSON, code, logs, and more.
+                            </p>
                         </div>
                     </div>
-                    <label className={`cursor-pointer rounded-full border px-4 py-2 text-sm transition hover:border-aurora/40 hover:bg-aurora/10 ${
-                        isLight ? "border-slate-300/70 bg-white/80 text-slate-800" : "border-white/10 bg-white/10"
-                    }`}>
+                    <label className="btn-outline cursor-pointer">
                         Choose File
                         <input type="file" className="hidden" onChange={(event) => handleUpload(event.target.files?.[0] ?? null)} />
                     </label>
                 </div>
-                <p className={`text-xs ${isLight ? "text-slate-600" : "text-white/60"}`}>
+                <p className="mt-3 text-xs text-mute">
                     {uploadedFile ? `Loaded file: ${uploadedFile.name}` : "No file selected. Manual text still works perfectly."}
                 </p>
             </motion.div>
 
-            <div className={`relative flex-1 overflow-hidden rounded-[30px] border ${
-                isLight ? "border-slate-300/70 bg-white/75" : "border-white/10 bg-slate-950/45"
-            }`}>
+            <div className="relative mb-6">
                 <textarea
                     value={text}
                     onChange={(event) => setText(event.target.value)}
                     placeholder={DEFAULT_PLACEHOLDER}
-                    className={`scrollbar-thin h-full min-h-[420px] w-full resize-none bg-transparent px-5 py-5 font-body text-[15px] leading-7 outline-none ${
-                        isLight ? "text-slate-900 placeholder:text-slate-400" : "text-white/90 placeholder:text-white/30"
-                    }`}
+                    className="form-textarea min-h-[320px]"
                 />
-                <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t ${
-                    isLight ? "from-white/90 to-transparent" : "from-[#070816] to-transparent"
-                }`} />
                 {draftTranscript && (
-                    <div className={`pointer-events-none absolute bottom-4 left-5 right-5 rounded-2xl border px-4 py-3 text-sm italic ${
-                        isLight
-                            ? "border-cyan-300/60 bg-cyan-50/90 text-slate-600"
-                            : "border-aurora/25 bg-aurora/10 text-white/65"
-                    }`}>
+                    <div className="pointer-events-none absolute bottom-3 left-3 right-3 rounded-sm border border-hairline bg-canvas-soft px-3 py-2 text-body-sm italic text-body">
                         Listening: {draftTranscript}
                     </div>
                 )}
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-col gap-3">
+            <div className="mb-6 flex flex-col gap-4">
+                <div>
+                    <p className="caption-mono mb-2">Summary Length</p>
                     <div className="flex flex-wrap gap-2">
                         {Object.keys(SUMMARY_PRESETS).map((preset) => (
                             <button
                                 key={preset}
                                 type="button"
                                 onClick={() => setSummaryPreset(preset)}
-                                className={`rounded-full px-4 py-2 text-sm transition ${
-                                    summaryPreset === preset
-                                        ? "bg-gradient-to-r from-aurora to-violet text-slate-950 shadow-neon"
-                                        : isLight
-                                            ? "border border-slate-300/70 bg-white/80 text-slate-700 hover:border-cyan-400/50 hover:text-slate-950"
-                                            : "border border-white/10 bg-white/5 text-white/70 hover:border-aurora/40 hover:text-white"
-                                }`}
+                                className={summaryPreset === preset ? "tab-ghost-active" : "tab-ghost"}
                             >
                                 {preset.charAt(0).toUpperCase() + preset.slice(1)}
                             </button>
                         ))}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className={`text-xs uppercase tracking-[0.25em] ${isLight ? "text-slate-500" : "text-white/45"}`}>
-                            Model
-                        </span>
+                </div>
+                <div>
+                    <p className="caption-mono mb-2">Model</p>
+                    <div className="flex flex-wrap gap-2">
                         {Object.entries(MODEL_OPTIONS).map(([modelKey, label]) => (
                             <button
                                 key={modelKey}
                                 type="button"
                                 onClick={() => setSummaryModel(modelKey)}
-                                className={`rounded-full px-4 py-2 text-sm transition ${
-                                    summaryModel === modelKey
-                                        ? "bg-gradient-to-r from-pulse to-aurora text-slate-950 shadow-neon"
-                                        : isLight
-                                            ? "border border-slate-300/70 bg-white/80 text-slate-700 hover:border-cyan-400/50 hover:text-slate-950"
-                                            : "border border-white/10 bg-white/5 text-white/70 hover:border-pulse/40 hover:text-white"
-                                }`}
+                                className={summaryModel === modelKey ? "tab-ghost-active" : "tab-ghost"}
                             >
                                 {label}
                             </button>
                         ))}
                     </div>
                 </div>
+            </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                    <div
-                        className={`rounded-2xl border px-4 py-3 text-sm ${
-                            isLight
-                                ? "border-slate-300/70 bg-white/80 text-slate-700"
-                                : "border-white/10 bg-white/5 text-white/75"
-                        }`}
-                    >
-                        {loading ? "Preparing summary..." : "Results open in a centered window"}
-                    </div>
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-hairline pt-6">
+                <div className="flex flex-wrap items-center gap-2">
                     <button
                         type="button"
                         onClick={isListening ? stopVoiceInput : startVoiceInput}
-                        className={`rounded-2xl border px-4 py-3 text-sm transition ${
-                            isListening
-                                ? "animate-pulseRing border-pulse/60 bg-pulse/15 text-pulse"
-                                : isLight
-                                    ? "border-slate-300/70 bg-white/80 text-slate-700 hover:border-pulse/40 hover:text-slate-950"
-                                    : "border-white/10 bg-white/5 text-white/75 hover:border-pulse/40 hover:text-white"
-                        }`}
+                        className={`btn-outline ${isListening ? "border-violet bg-violet-soft text-violet-deep" : ""}`}
                     >
-                        <span className="flex items-center gap-2">
-                            <Mic size={16} />
-                            {isListening ? "Listening..." : "Voice Input"}
-                        </span>
+                        <Mic size={14} />
+                        {isListening ? "Listening..." : "Voice Input"}
                     </button>
-                    <button
-                        type="button"
-                        onClick={handleClear}
-                        className={`rounded-2xl border px-4 py-3 text-sm transition hover:border-rose-400/40 ${
-                            isLight
-                                ? "border-slate-300/70 bg-white/80 text-slate-700 hover:text-slate-950"
-                                : "border-white/10 bg-white/5 text-white/75 hover:text-white"
-                        }`}
-                    >
-                        <span className="flex items-center gap-2">
-                            <Trash2 size={16} />
-                            Clear
-                        </span>
+                    <button type="button" onClick={handleClear} className="btn-outline">
+                        <Trash2 size={14} />
+                        Clear
+                    </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-body-sm text-mute">
+                        {loading ? "Preparing summary..." : "Results open in a focused window"}
+                    </span>
+                    <button type="button" onClick={handleSummarize} disabled={loading} className="btn-primary">
+                        <Sparkles size={16} />
+                        {loading ? "Summarizing..." : "Summarize"}
                     </button>
                 </div>
             </div>
@@ -698,152 +679,49 @@ function InputPanel(props) {
     );
 }
 
-function OutputPanel(props) {
-    const {
-        isLight,
-        loading,
-        analysis,
-        confidence,
-        aiSignal,
-        overview,
-        displayedSummary,
-        summary,
-        outputSentences,
-        keyTerms,
-        copied,
-        handleCopy,
-        handleDownloadPdf,
-        uploadedFile,
-        setResultsOpen,
-    } = props;
+function FeatureGrid() {
+    const features = [
+        {
+            title: "Extractive AI.",
+            body: "TextRank-style sentence ranking picks the most important ideas from your source text.",
+            mono: "extractive",
+        },
+        {
+            title: "PEGASUS model.",
+            body: "Abstractive summarization for fluent, human-like output on longer documents.",
+            mono: "pegasus",
+        },
+        {
+            title: "Rich analytics.",
+            body: "Confidence scores, keyword highlights, reading time, and AI-writing signal detection.",
+            mono: "analytics",
+        },
+    ];
 
     return (
-        <motion.section
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`glass-panel flex min-h-[72vh] flex-col rounded-[32px] border p-5 shadow-glass ${
-                isLight ? "border-slate-300/60" : "border-white/10"
-            }`}
-        >
-            <div className="mb-5 flex items-start justify-between gap-4">
-                <div>
-                    <p className="font-body text-xs uppercase tracking-[0.35em] text-pulse/80">Output Matrix</p>
-                    <h2 className={`font-display text-2xl font-semibold ${isLight ? "text-slate-900" : ""}`}>Summary Intelligence</h2>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => setResultsOpen(true)} className={`rounded-2xl border p-3 transition hover:scale-105 hover:border-pulse/40 ${isLight ? "border-slate-300/70 bg-white/80 text-slate-700 hover:text-slate-950" : "border-white/10 bg-white/5 text-white/75 hover:text-white"}`}><Sparkles size={18} /></button>
-                    <button type="button" onClick={handleCopy} className={`rounded-2xl border p-3 transition hover:scale-105 hover:border-aurora/40 ${isLight ? "border-slate-300/70 bg-white/80 text-slate-700 hover:text-slate-950" : "border-white/10 bg-white/5 text-white/75 hover:text-white"}`}><Copy size={18} /></button>
-                    <button type="button" onClick={handleDownloadPdf} className={`rounded-2xl border p-3 transition hover:scale-105 hover:border-violet/40 ${isLight ? "border-slate-300/70 bg-white/80 text-slate-700 hover:text-slate-950" : "border-white/10 bg-white/5 text-white/75 hover:text-white"}`}><Download size={18} /></button>
-                </div>
-            </div>
-
-            <div className="mb-5 grid gap-3 sm:grid-cols-3">
-                <MetricCard label="Confidence" value={`${confidence}%`} tone="from-aurora/30 to-violet/20" />
-                <MetricCard label="AI Signal" value={`${aiSignal}%`} tone="from-violet/30 to-pulse/20" />
-                <MetricCard label="Reading Time" value={`${analysis?.summary_reading_time_minutes ?? 0} min`} tone="from-pulse/30 to-aurora/20" />
-            </div>
-
-            <div className={`mb-5 rounded-[26px] border px-5 py-4 ${
-                isLight ? "border-cyan-300/55 bg-cyan-50/80" : "border-aurora/30 bg-aurora/10"
-            }`}>
-                <p className="mb-2 text-xs uppercase tracking-[0.28em] text-aurora">What It's About</p>
-                <p className={`text-sm leading-7 ${isLight ? "text-slate-700" : "text-white/80"}`}>
-                    {overview || "A clear one-line explanation of the text will appear here."}
+        <section className="mb-16">
+            <div className="mb-8 text-center">
+                <p className="caption-mono mb-2">Capabilities</p>
+                <h2 className="text-display-lg text-ink">A compute model for all workloads.</h2>
+                <p className="mx-auto mt-4 max-w-xl text-body-md text-body">
+                    Two summarization engines, one interface. Choose the model that fits your content.
                 </p>
             </div>
-
-            <button
-                type="button"
-                onClick={() => setResultsOpen(true)}
-                className={`mb-5 rounded-[24px] border px-5 py-4 text-left transition hover:scale-[1.01] ${
-                    isLight
-                        ? "border-slate-300/70 bg-white/75 text-slate-700 hover:border-cyan-400/45"
-                        : "border-white/10 bg-white/[0.04] text-white/72 hover:border-aurora/35"
-                }`}
-            >
-                <div className="mb-2 flex items-center gap-3">
-                    <div className="rounded-2xl bg-gradient-to-r from-aurora to-violet p-2 text-slate-950 shadow-neon">
-                        <Sparkles size={16} />
+            <div className="grid gap-6 md:grid-cols-3">
+                {features.map((feature) => (
+                    <div key={feature.mono} className="card-marketing">
+                        <p className="caption-mono mb-3 text-mute">{feature.mono}</p>
+                        <h3 className="text-display-sm text-ink">{feature.title}</h3>
+                        <p className="mt-2 text-body-sm text-body">{feature.body}</p>
                     </div>
-                    <span className="font-display text-base font-semibold">Open Interactive Results Window</span>
-                </div>
-                <p className={`text-sm ${isLight ? "text-slate-600" : "text-white/55"}`}>
-                    Expand the summary into a focused view with the overview, full result, metrics, copy, and download actions.
-                </p>
-            </button>
-
-            <div className={`relative flex-1 overflow-hidden rounded-[30px] border p-5 ${
-                isLight ? "border-slate-300/70 bg-white/75" : "border-white/10 bg-slate-950/45"
-            }`}>
-                <AnimatePresence mode="wait">
-                    {loading ? (
-                        <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full flex-col items-center justify-center gap-6">
-                            <div className="relative flex items-center justify-center">
-                                <span className="absolute h-28 w-28 rounded-full border border-aurora/25" />
-                                <span className="absolute h-20 w-20 rounded-full border border-violet/35" />
-                                <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2.4, ease: "linear" }} className="rounded-full bg-gradient-to-r from-aurora via-violet to-pulse p-4 shadow-neon">
-                                    <Sparkles size={26} />
-                                </motion.span>
-                            </div>
-                            <div className="text-center">
-                                <p className={`font-display text-lg ${isLight ? "text-slate-900" : ""}`}>AI is thinking...</p>
-                                <p className={`text-sm ${isLight ? "text-slate-600" : "text-white/55"}`}>Ranking ideas, condensing context, and refining output.</p>
-                            </div>
-                        </motion.div>
-                    ) : (
-                        <motion.div key="summary" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="scrollbar-thin h-full overflow-y-auto pr-2">
-                            <div className="mb-4 flex items-center justify-between gap-4">
-                                <div className={`text-sm ${isLight ? "text-slate-600" : "text-white/55"}`}>{analysis ? `${analysis.summary_word_count} words in summary` : "Ready for generation"}</div>
-                                {copied && <div className="text-xs text-pulse">Copied to clipboard</div>}
-                            </div>
-
-                            {displayedSummary ? (
-                                <div className="space-y-4">
-                                    {outputSentences.map((sentence, index) => {
-                                        const isKeySentence = Array.from(keyTerms).some((term) => sentence.toLowerCase().includes(term.toLowerCase()));
-                                        return (
-                                            <motion.p
-                                                key={`${sentence}-${index}`}
-                                                initial={{ opacity: 0, x: 8 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: index * 0.05 }}
-                                                className={`rounded-2xl border px-4 py-4 text-wrap-pretty text-[15px] leading-7 ${
-                                                    isKeySentence
-                                                        ? isLight
-                                                            ? "border-cyan-400/50 bg-cyan-50 text-slate-900 shadow-[0_10px_30px_rgba(56,189,248,0.18)]"
-                                                            : "border-aurora/35 bg-aurora/10 shadow-neon"
-                                                        : isLight
-                                                            ? "border-slate-300/70 bg-white/70 text-slate-800"
-                                                            : "border-white/8 bg-white/[0.03]"
-                                                }`}
-                                            >
-                                                {sentence}
-                                            </motion.p>
-                                        );
-                                    })}
-                                    {displayedSummary.length < summary.length && <span className="ml-2 inline-block h-5 w-[2px] animate-blink bg-aurora align-middle" />}
-                                </div>
-                            ) : (
-                                <p className={`text-[15px] leading-7 ${isLight ? "text-slate-500" : "text-white/38"}`}>{DEFAULT_OUTPUT}</p>
-                            )}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                ))}
             </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <InsightCard isLight={isLight} icon={<AudioLines size={18} />} title="Source Stats" body={analysis ? `${analysis.input_word_count} words, ${analysis.input_sentence_count} sentences, ${analysis.input_character_count} characters` : "Upload a document or paste content to see live analytics."} />
-                <InsightCard isLight={isLight} icon={<WandSparkles size={18} />} title="AI Writing Risk Estimate" body={analysis?.ai_writing_signals?.details || "Heuristic-based guidance appears here after processing."} />
-                <InsightCard isLight={isLight} icon={<History size={18} />} title="Source File" body={uploadedFile?.name || "Manual text input"} />
-                <InsightCard isLight={isLight} icon={<Sparkles size={18} />} title="Top Keywords" body={analysis?.top_keywords?.join(", ") || "Keywords will surface after summarization."} />
-            </div>
-        </motion.section>
+        </section>
     );
 }
 
 function ResultsWindow(props) {
     const {
-        isLight,
         resultsOpen,
         setResultsOpen,
         loading,
@@ -871,7 +749,7 @@ function ResultsWindow(props) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setResultsOpen(false)}
-                        className={`fixed inset-0 z-40 backdrop-blur-md ${isLight ? "bg-slate-200/55" : "bg-slate-950/72"}`}
+                        className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-sm"
                     />
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5">
                         <motion.section
@@ -879,110 +757,124 @@ function ResultsWindow(props) {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.96, y: 24 }}
                             transition={{ duration: 0.22, ease: "easeOut" }}
-                            className={`glass-panel flex max-h-[92vh] min-h-0 w-[min(1240px,96vw)] flex-col overflow-hidden rounded-[34px] border p-4 shadow-glass sm:p-6 ${
-                                isLight ? "border-slate-300/70" : "border-white/10"
-                            }`}
+                            className="flex max-h-[92vh] min-h-0 w-[min(1240px,96vw)] flex-col overflow-hidden rounded-lg bg-canvas p-4 shadow-elevation-5 sm:p-6"
                         >
-                        <div className="mb-5 flex items-start justify-between gap-4">
-                            <div>
-                                <p className="font-body text-xs uppercase tracking-[0.35em] text-aurora/80">Interactive Results</p>
-                                <h3 className={`font-display text-2xl font-semibold ${isLight ? "text-slate-900" : ""}`}>Summary Window</h3>
-                                <p className={`mt-2 text-sm ${isLight ? "text-slate-600" : "text-white/55"}`}>
-                                    {uploadedFile?.name || "Manual text input"}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button type="button" onClick={handleCopy} className={`rounded-2xl border p-3 transition hover:scale-105 ${isLight ? "border-slate-300/70 bg-white/80 text-slate-700" : "border-white/10 bg-white/5 text-white/75"}`}><Copy size={18} /></button>
-                                <button type="button" onClick={handleDownloadPdf} className={`rounded-2xl border p-3 transition hover:scale-105 ${isLight ? "border-slate-300/70 bg-white/80 text-slate-700" : "border-white/10 bg-white/5 text-white/75"}`}><Download size={18} /></button>
-                                <button type="button" onClick={() => setResultsOpen(false)} className={`rounded-2xl border p-3 transition hover:scale-105 ${isLight ? "border-slate-300/70 bg-white/80 text-slate-700" : "border-white/10 bg-white/5 text-white/75"}`}><X size={18} /></button>
-                            </div>
-                        </div>
-
-                        <div className="mb-5 grid gap-3 md:grid-cols-4">
-                            <MetricCard label="Confidence" value={`${confidence}%`} tone="from-aurora/30 to-violet/20" />
-                            <MetricCard label="AI Signal" value={`${aiSignal}%`} tone="from-violet/30 to-pulse/20" />
-                            <MetricCard label="Summary Words" value={`${analysis?.summary_word_count ?? 0}`} tone="from-pulse/30 to-aurora/20" />
-                            <MetricCard label="Reading Time" value={`${analysis?.summary_reading_time_minutes ?? 0} min`} tone="from-aurora/25 to-pulse/20" />
-                        </div>
-
-                        <div className="grid min-h-0 flex-1 gap-5 overflow-hidden lg:grid-cols-[0.9fr_1.1fr]">
-                            <div className="scrollbar-thin flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-                                <div className={`rounded-[26px] border px-5 py-4 ${isLight ? "border-cyan-300/55 bg-cyan-50/80" : "border-aurora/30 bg-aurora/10"}`}>
-                                    <p className="mb-2 text-xs uppercase tracking-[0.28em] text-aurora">What It's About</p>
-                                    <p className={`text-sm leading-7 ${isLight ? "text-slate-700" : "text-white/80"}`}>
-                                        {overview || "A clear one-line explanation of the text will appear here."}
+                            <div className="mb-5 flex items-start justify-between gap-4">
+                                <div>
+                                    <p className="caption-mono mb-2">Interactive Results</p>
+                                    <h3 className="text-display-md text-ink">Summary window.</h3>
+                                    <p className="mt-1 text-body-sm text-mute">
+                                        {uploadedFile?.name || "Manual text input"}
                                     </p>
                                 </div>
-
-                                <div className={`rounded-[26px] border p-5 ${isLight ? "border-slate-300/70 bg-white/75" : "border-white/10 bg-white/[0.04]"}`}>
-                                    <p className={`mb-3 font-display text-lg font-semibold ${isLight ? "text-slate-900" : ""}`}>Summary Insights</p>
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <InsightCard isLight={isLight} icon={<AudioLines size={18} />} title="Source Stats" body={analysis ? `${analysis.input_word_count} words, ${analysis.input_sentence_count} sentences, ${analysis.input_character_count} characters` : "No analytics yet."} />
-                                        <InsightCard isLight={isLight} icon={<History size={18} />} title="Source File" body={uploadedFile?.name || "Manual text input"} />
-                                        <InsightCard isLight={isLight} icon={<WandSparkles size={18} />} title="AI Writing Risk Estimate" body={analysis?.ai_writing_signals?.details || "Heuristic-based guidance appears here after processing."} />
-                                        <InsightCard isLight={isLight} icon={<Sparkles size={18} />} title="Top Keywords" body={analysis?.top_keywords?.join(", ") || "Keywords will surface after summarization."} />
-                                    </div>
+                                <div className="flex items-center gap-2">
+                                    <button type="button" onClick={handleCopy} className="icon-btn" aria-label="Copy">
+                                        <Copy size={16} />
+                                    </button>
+                                    <button type="button" onClick={handleDownloadPdf} className="icon-btn" aria-label="Download PDF">
+                                        <Download size={16} />
+                                    </button>
+                                    <button type="button" onClick={() => setResultsOpen(false)} className="icon-btn" aria-label="Close">
+                                        <X size={16} />
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className={`min-h-0 overflow-hidden rounded-[30px] border p-4 sm:p-5 ${isLight ? "border-slate-300/70 bg-white/78" : "border-white/10 bg-slate-950/45"}`}>
-                                <div className="mb-4 flex items-center justify-between gap-4">
-                                    <div className={`text-sm ${isLight ? "text-slate-600" : "text-white/55"}`}>
-                                        {analysis ? `${analysis.summary_word_count} words in summary` : "Ready for generation"}
-                                    </div>
-                                    {copied && <div className="text-xs text-pulse">Copied to clipboard</div>}
-                                </div>
+                            <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <MetricCard label="Confidence" value={`${confidence}%`} />
+                                <MetricCard label="AI Signal" value={`${aiSignal}%`} />
+                                <MetricCard label="Summary Words" value={`${analysis?.summary_word_count ?? 0}`} />
+                                <MetricCard label="Reading Time" value={`${analysis?.summary_reading_time_minutes ?? 0} min`} />
+                            </div>
 
-                                <div className="scrollbar-thin h-[calc(100%-32px)] min-h-0 overflow-y-auto pr-2">
-                                    {loading ? (
-                                        <div className="flex h-full flex-col items-center justify-center gap-6">
-                                            <motion.span
-                                                animate={{ rotate: 360 }}
-                                                transition={{ repeat: Infinity, duration: 2.4, ease: "linear" }}
-                                                className="rounded-full bg-gradient-to-r from-aurora via-violet to-pulse p-4 shadow-neon"
-                                            >
-                                                <Sparkles size={26} />
-                                            </motion.span>
-                                            <p className={`text-sm ${isLight ? "text-slate-600" : "text-white/55"}`}>Generating interactive summary view...</p>
-                                        </div>
-                                    ) : displayedSummary ? (
-                                        <div className="space-y-4">
-                                            {outputSentences.map((sentence, index) => {
-                                                const isKeySentence = Array.from(keyTerms).some((term) =>
-                                                    sentence.toLowerCase().includes(term.toLowerCase())
-                                                );
-                                                return (
-                                                    <motion.p
-                                                        key={`${sentence}-${index}-window`}
-                                                        initial={{ opacity: 0, x: 8 }}
-                                                        animate={{ opacity: 1, x: 0 }}
-                                                        transition={{ delay: index * 0.05 }}
-                                                        className={`rounded-2xl border px-4 py-4 text-[15px] leading-7 ${
-                                                            isKeySentence
-                                                                ? isLight
-                                                                    ? "border-cyan-400/50 bg-cyan-50 text-slate-900 shadow-[0_10px_30px_rgba(56,189,248,0.18)]"
-                                                                    : "border-aurora/35 bg-aurora/10 shadow-neon"
-                                                                : isLight
-                                                                    ? "border-slate-300/70 bg-white/70 text-slate-800"
-                                                                    : "border-white/8 bg-white/[0.03]"
-                                                        }`}
-                                                    >
-                                                        {sentence}
-                                                    </motion.p>
-                                                );
-                                            })}
-                                            {displayedSummary.length < summary.length && (
-                                                <span className="ml-2 inline-block h-5 w-[2px] animate-blink bg-aurora align-middle" />
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <p className={`text-[15px] leading-7 ${isLight ? "text-slate-500" : "text-white/38"}`}>
-                                            Your summary will open here in a focused interactive window.
+                            <div className="grid min-h-0 flex-1 gap-5 overflow-hidden lg:grid-cols-[0.9fr_1.1fr]">
+                                <div className="scrollbar-thin flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
+                                    <div className="rounded-md border border-hairline bg-link-bg-soft/40 px-5 py-4">
+                                        <p className="caption-mono mb-2 text-link">What it&apos;s about</p>
+                                        <p className="text-body-sm leading-6 text-ink">
+                                            {overview || "A clear one-line explanation of the text will appear here."}
                                         </p>
-                                    )}
+                                    </div>
+
+                                    <div className="rounded-md border border-hairline bg-canvas-soft p-5">
+                                        <p className="text-display-sm mb-3 text-ink">Summary insights.</p>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <InsightCard
+                                                icon={<AudioLines size={16} />}
+                                                title="Source Stats"
+                                                body={
+                                                    analysis
+                                                        ? `${analysis.input_word_count} words, ${analysis.input_sentence_count} sentences, ${analysis.input_character_count} characters`
+                                                        : "No analytics yet."
+                                                }
+                                            />
+                                            <InsightCard
+                                                icon={<History size={16} />}
+                                                title="Source File"
+                                                body={uploadedFile?.name || "Manual text input"}
+                                            />
+                                            <InsightCard
+                                                icon={<WandSparkles size={16} />}
+                                                title="AI Writing Risk"
+                                                body={analysis?.ai_writing_signals?.details || "Heuristic guidance appears here after processing."}
+                                            />
+                                            <InsightCard
+                                                icon={<Sparkles size={16} />}
+                                                title="Top Keywords"
+                                                body={analysis?.top_keywords?.join(", ") || "Keywords will surface after summarization."}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="min-h-0 overflow-hidden rounded-md border border-hairline bg-canvas p-4 sm:p-5">
+                                    <div className="mb-4 flex items-center justify-between gap-4">
+                                        <div className="text-body-sm text-mute">
+                                            {analysis ? `${analysis.summary_word_count} words in summary` : "Ready for generation"}
+                                        </div>
+                                        {copied && <div className="text-xs text-link">Copied to clipboard</div>}
+                                    </div>
+
+                                    <div className="scrollbar-thin h-[calc(100%-32px)] min-h-[280px] overflow-y-auto pr-2">
+                                        {loading ? (
+                                            <div className="flex h-full flex-col items-center justify-center gap-4">
+                                                <motion.span
+                                                    animate={{ rotate: 360 }}
+                                                    transition={{ repeat: Infinity, duration: 2.4, ease: "linear" }}
+                                                    className="flex h-12 w-12 items-center justify-center rounded-full bg-ink text-on-primary"
+                                                >
+                                                    <Sparkles size={20} />
+                                                </motion.span>
+                                                <p className="text-body-sm text-mute">Generating interactive summary view...</p>
+                                            </div>
+                                        ) : displayedSummary ? (
+                                            <div className="space-y-3">
+                                                {outputSentences.map((sentence, index) => {
+                                                    const isKeySentence = Array.from(keyTerms).some((term) =>
+                                                        sentence.toLowerCase().includes(term.toLowerCase())
+                                                    );
+                                                    return (
+                                                        <motion.p
+                                                            key={`${sentence}-${index}-window`}
+                                                            initial={{ opacity: 0, x: 8 }}
+                                                            animate={{ opacity: 1, x: 0 }}
+                                                            transition={{ delay: index * 0.05 }}
+                                                            className={isKeySentence ? "sentence-key" : "sentence-default"}
+                                                        >
+                                                            {sentence}
+                                                        </motion.p>
+                                                    );
+                                                })}
+                                                {displayedSummary.length < summary.length && (
+                                                    <span className="ml-2 inline-block h-5 w-0.5 animate-blink bg-ink align-middle" />
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-body-sm leading-6 text-mute">{DEFAULT_OUTPUT}</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         </motion.section>
                     </div>
                 </>
@@ -991,38 +883,7 @@ function ResultsWindow(props) {
     );
 }
 
-function FloatingActions({ isLight, addRipple, handleSummarize, handleCopy, handleClear, ripples }) {
-    return (
-        <div className="fixed bottom-6 right-6 z-20 flex flex-col gap-3">
-            <FloatingActionButton label="Summarize" onClick={handleSummarize} onPointerDown={addRipple} variant="primary">
-                <Sparkles size={18} />
-            </FloatingActionButton>
-            <FloatingActionButton isLight={isLight} label="Copy" onClick={handleCopy} onPointerDown={addRipple}>
-                <Copy size={18} />
-            </FloatingActionButton>
-            <FloatingActionButton isLight={isLight} label="Clear" onClick={handleClear} onPointerDown={addRipple}>
-                <X size={18} />
-            </FloatingActionButton>
-
-            {ripples.map((ripple) => (
-                <span
-                    key={ripple.id}
-                    className="pointer-events-none fixed rounded-full bg-aurora/25"
-                    style={{
-                        left: ripple.x,
-                        top: ripple.y,
-                        width: ripple.size,
-                        height: ripple.size,
-                        transform: "scale(0)",
-                        animation: "ripple 650ms ease-out forwards",
-                    }}
-                />
-            ))}
-        </div>
-    );
-}
-
-function HistoryDrawer({ isLight, historyOpen, setHistoryOpen, historyItems, loadHistoryItem }) {
+function HistoryDrawer({ historyOpen, setHistoryOpen, historyItems, loadHistoryItem }) {
     return (
         <AnimatePresence>
             {historyOpen && (
@@ -1033,34 +894,30 @@ function HistoryDrawer({ isLight, historyOpen, setHistoryOpen, historyItems, loa
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setHistoryOpen(false)}
-                        className={`fixed inset-0 z-30 backdrop-blur-sm ${isLight ? "bg-slate-200/45" : "bg-slate-950/55"}`}
+                        className="fixed inset-0 z-30 bg-ink/15 backdrop-blur-sm"
                     />
                     <motion.aside
                         initial={{ x: -420 }}
                         animate={{ x: 0 }}
                         exit={{ x: -420 }}
                         transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                        className={`glass-panel fixed left-0 top-0 z-40 h-full w-full max-w-md border-r p-5 shadow-glass ${
-                            isLight ? "border-slate-300/60" : "border-white/10"
-                        }`}
+                        className="fixed left-0 top-0 z-40 flex h-full w-full max-w-md flex-col border-r border-hairline bg-canvas shadow-elevation-5"
                     >
-                        <div className="mb-5 flex items-center justify-between">
+                        <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
                             <div>
-                                <p className="font-body text-xs uppercase tracking-[0.35em] text-aurora/80">Recent Runs</p>
-                                <h3 className="font-display text-xl font-semibold">Summary History</h3>
+                                <p className="caption-mono mb-1">Recent Runs</p>
+                                <h3 className="text-display-sm text-ink">Summary history.</h3>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setHistoryOpen(false)}
-                                className={`rounded-2xl border p-3 ${isLight ? "border-slate-300/70 bg-white/80 text-slate-700" : "border-white/10 bg-white/5 text-white/75"}`}
-                            >
+                            <button type="button" onClick={() => setHistoryOpen(false)} className="icon-btn">
                                 <X size={16} />
                             </button>
                         </div>
-                        <div className="scrollbar-thin flex h-[calc(100%-84px)] flex-col gap-3 overflow-y-auto pr-1">
+                        <div className="scrollbar-thin flex flex-1 flex-col gap-1 overflow-y-auto p-3">
                             {historyItems.length === 0 ? (
-                                <div className={`rounded-[24px] border p-4 text-sm ${isLight ? "border-slate-300/70 bg-white/70 text-slate-600" : "border-white/10 bg-white/[0.03] text-white/55"}`}>
-                                    Your recent summaries will appear here for quick recall.
+                                <div className="rounded-lg bg-canvas-soft p-8 text-center">
+                                    <p className="text-body-md text-body">
+                                        Your recent summaries will appear here for quick recall.
+                                    </p>
                                 </div>
                             ) : (
                                 historyItems.map((item) => (
@@ -1068,22 +925,14 @@ function HistoryDrawer({ isLight, historyOpen, setHistoryOpen, historyItems, loa
                                         key={item.id}
                                         type="button"
                                         onClick={() => loadHistoryItem(item)}
-                                        className={`rounded-[24px] border p-4 text-left transition hover:border-aurora/35 ${
-                                            isLight
-                                                ? "border-slate-300/70 bg-white/72 hover:bg-cyan-50"
-                                                : "border-white/10 bg-white/[0.04] hover:bg-aurora/10"
-                                        }`}
+                                        className="history-row group w-full"
                                     >
-                                        <div className="mb-2 flex items-center justify-between gap-3">
-                                            <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.2em] ${
-                                                isLight ? "border-slate-300/70 bg-white/85 text-slate-600" : "border-white/10 bg-white/10 text-white/60"
-                                            }`}>
-                                                {item.preset}
-                                            </span>
-                                            <span className={`text-xs ${isLight ? "text-slate-500" : "text-white/45"}`}>{item.createdAt}</span>
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="badge-secondary">{item.preset}</span>
+                                            <span className="text-xs text-mute">{item.createdAt}</span>
                                         </div>
-                                        <p className={`line-clamp-3 text-sm ${isLight ? "text-slate-700" : "text-white/72"}`}>{item.inputPreview || "Uploaded file summary"}</p>
-                                        <p className="mt-3 text-xs text-pulse">{item.sourceFile || "Manual input"}</p>
+                                        <p className="line-clamp-2 text-body-sm text-ink">{item.inputPreview || "Uploaded file summary"}</p>
+                                        <p className="mt-1 font-mono text-xs text-mute">{item.sourceFile || "Manual input"}</p>
                                     </button>
                                 ))
                             )}
@@ -1095,46 +944,77 @@ function HistoryDrawer({ isLight, historyOpen, setHistoryOpen, historyItems, loa
     );
 }
 
-function MetricCard({ label, value, tone }) {
+function Footer() {
+    const columns = [
+        {
+            title: "Product",
+            links: ["Summarize", "Analytics", "History", "API"],
+        },
+        {
+            title: "Models",
+            links: ["Extractive AI", "PEGASUS", "Benchmarks", "Training"],
+        },
+        {
+            title: "Resources",
+            links: ["Documentation", "Guides", "Support", "Changelog"],
+        },
+        {
+            title: "Company",
+            links: ["About", "Blog", "Privacy", "Terms"],
+        },
+    ];
+
     return (
-        <motion.div whileHover={{ y: -4, scale: 1.01 }} className={`rounded-[24px] border border-white/10 bg-gradient-to-br ${tone} px-4 py-4`}>
-            <p className="mb-2 text-xs uppercase tracking-[0.28em] text-white/55">{label}</p>
-            <h3 className="font-display text-2xl font-semibold">{value}</h3>
-        </motion.div>
+        <footer className="border-t border-hairline bg-canvas px-4 py-16 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-page">
+                <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+                    {columns.map((column) => (
+                        <div key={column.title}>
+                            <p className="caption-mono mb-4 text-mute">{column.title}</p>
+                            <ul className="space-y-2">
+                                {column.links.map((link) => (
+                                    <li key={link}>
+                                        <button type="button" className="text-body-sm text-body transition hover:text-ink">
+                                            {link}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-hairline pt-8">
+                    <div className="flex items-center gap-2">
+                        <div className="flex h-5 w-5 items-center justify-center rounded-sm bg-ink">
+                            <Sparkles size={12} className="text-on-primary" />
+                        </div>
+                        <span className="text-body-sm text-mute">Text Summarization</span>
+                    </div>
+                    <p className="text-xs text-mute">© 2026 Text Summarization. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
     );
 }
 
-function InsightCard({ isLight, icon, title, body }) {
+function MetricCard({ label, value }) {
     return (
-        <motion.div whileHover={{ y: -4 }} className={`rounded-[26px] border p-4 ${isLight ? "border-slate-300/70 bg-white/72" : "border-white/10 bg-white/[0.04]"}`}>
-            <div className={`mb-3 flex h-11 w-11 items-center justify-center rounded-2xl text-aurora ${isLight ? "bg-cyan-50" : "bg-white/10"}`}>{icon}</div>
-            <h4 className={`font-display text-base font-semibold ${isLight ? "text-slate-900" : ""}`}>{title}</h4>
-            <p className={`mt-2 text-sm leading-6 ${isLight ? "text-slate-600" : "text-white/58"}`}>{body}</p>
-        </motion.div>
+        <div className="metric-card">
+            <p className="caption-mono mb-2 text-mute">{label}</p>
+            <p className="text-display-sm text-ink">{value}</p>
+        </div>
     );
 }
 
-function FloatingActionButton({ isLight, children, label, onClick, onPointerDown, variant = "secondary" }) {
+function InsightCard({ icon, title, body }) {
     return (
-        <motion.button
-            whileHover={{ scale: 1.06, y: -2 }}
-            whileTap={{ scale: 0.96 }}
-            type="button"
-            onClick={onClick}
-            onPointerDown={onPointerDown}
-            className={`relative overflow-hidden rounded-full border px-5 py-4 text-sm font-medium shadow-glass transition ${
-                variant === "primary"
-                    ? "border-aurora/40 bg-gradient-to-r from-aurora to-violet text-slate-950 shadow-neon"
-                    : isLight
-                        ? "border-slate-300/80 bg-white/88 text-slate-800 backdrop-blur-xl"
-                        : "border-white/10 bg-white/10 text-white/85 backdrop-blur-xl"
-            }`}
-        >
-            <span className="relative z-10 flex items-center gap-2">
-                {children}
-                {label}
-            </span>
-        </motion.button>
+        <div className="insight-card">
+            <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-md bg-canvas-soft-2 text-ink">
+                {icon}
+            </div>
+            <h4 className="text-body-sm font-medium text-ink">{title}</h4>
+            <p className="mt-1 text-xs leading-5 text-body">{body}</p>
+        </div>
     );
 }
 

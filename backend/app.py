@@ -4,12 +4,14 @@ from flask import Flask, jsonify, render_template, request
 
 try:
     from backend.analysis import analyze_text
+    from backend.bart_model import BART_SUMMARIZER
     from backend.file_utils import extract_text_from_upload
     from backend.pegasus_model import PEGASUS_SUMMARIZER
     from backend.summarizer import generate_overview, normalize_input_text, summarize_text
     from backend.supervised_model import load_supervised_summarizer
 except ModuleNotFoundError:
     from analysis import analyze_text
+    from bart_model import BART_SUMMARIZER
     from file_utils import extract_text_from_upload
     from pegasus_model import PEGASUS_SUMMARIZER
     from summarizer import generate_overview, normalize_input_text, summarize_text
@@ -82,6 +84,8 @@ def summarize():
     try:
         if model_type == "pegasus":
             summary = PEGASUS_SUMMARIZER.summarize(text, summary_length=summary_length)
+        elif model_type == "bart":
+            summary = BART_SUMMARIZER.summarize(text, summary_length=summary_length)
         else:
             trained_summarizer = get_trained_summarizer()
             if trained_summarizer is not None:
@@ -91,8 +95,14 @@ def summarize():
     except RuntimeError as error:
         return jsonify({"error": str(error)}), 400
     except Exception as error:
-        label = "PEGASUS" if model_type == "pegasus" else "summarization"
+        if model_type == "pegasus":
+            label = "PEGASUS"
+        elif model_type == "bart":
+            label = "BART"
+        else:
+            label = "summarization"
         return jsonify({"error": f"{label} failed: {error}"}), 500
+
 
     overview = generate_overview(summary or text)
     analysis = analyze_text(text, summary)
