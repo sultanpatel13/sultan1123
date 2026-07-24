@@ -32,7 +32,7 @@ class PegasusSummarizer:
             )
 
         if self._tokenizer is None or self._model is None:
-            self._tokenizer = PegasusTokenizer.from_pretrained(self.model_name, force_download=True)
+            self._tokenizer = PegasusTokenizer.from_pretrained(self.model_name)
             self._model = PegasusForConditionalGeneration.from_pretrained(self.model_name)
             self._model.eval()
 
